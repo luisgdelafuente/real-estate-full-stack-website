@@ -101,3 +101,35 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Por favor, verifica que el backend de la aplicación esté funcionando correctamente. Prueba la ruta /api/ para asegurarte de que devuelve una respuesta correcta."
+
+backend:
+  - task: "API Root Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "The /api/ endpoint is working correctly. It returns a 200 status code and the expected message 'Bienvenido a la API de InmobiliariaZaragoza'."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "API Root Endpoint"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "I've tested the /api/ endpoint and it's working correctly. The backend server is running and responding with the expected message."
