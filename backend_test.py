@@ -7,7 +7,7 @@ def test_api_root():
     print("Testing /api/ endpoint...")
     
     # Get the backend URL from the frontend .env file
-    backend_url = "https://9d185aaf-c3e8-425e-98f3-a01c221f8c98.preview.emergentagent.com"
+    backend_url = "https://2a6a5997-4b69-45db-944d-259024b9ca70.preview.emergentagent.com"
     
     try:
         # Make a GET request to the API root
