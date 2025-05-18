@@ -81,6 +81,7 @@ export default function AdminLogin() {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">Para la demostración: admin@inmobiliariazaragoza.com</p>
             </div>
 
             <div>
@@ -99,6 +100,7 @@ export default function AdminLogin() {
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">Para la demostración: adminpassword</p>
             </div>
 
             <div className="flex items-center justify-between">
