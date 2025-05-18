@@ -1,8 +1,5 @@
-import { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { useRouter } from 'next/router';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const navigation = [
   { name: 'Inicio', href: '/' },
@@ -12,12 +9,12 @@ const navigation = [
   { name: 'Contacto', href: '/contacto' },
 ];
 
-export default function Header() {
+function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const router = useRouter();
+  const location = useLocation();
   
   const isActive = (path) => {
-    return router.pathname === path;
+    return location.pathname === path;
   };
 
   return (
@@ -25,18 +22,18 @@ export default function Header() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" aria-label="Top">
         <div className="w-full py-4 flex items-center justify-between border-b border-gray-200 lg:border-none">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center">
-              <span className="text-2xl font-bold text-primary">Inmobiliaria<span className="text-secondary">Zaragoza</span></span>
+            <Link to="/" className="flex items-center">
+              <span className="text-2xl font-bold text-[#252359]">Inmobiliaria<span className="text-[#2D3773]">Zaragoza</span></span>
             </Link>
             <div className="hidden ml-10 space-x-8 lg:block">
               {navigation.map((link) => (
                 <Link 
                   key={link.name} 
-                  href={link.href}
+                  to={link.href}
                   className={`${
                     isActive(link.href)
-                      ? 'text-primary font-medium border-b-2 border-primary'
-                      : 'text-dark hover:text-primary'
+                      ? 'text-[#252359] font-medium border-b-2 border-[#252359]'
+                      : 'text-[#0D0D0D] hover:text-[#252359]'
                   } text-base font-medium px-1 py-2`}
                 >
                   {link.name}
@@ -46,8 +43,8 @@ export default function Header() {
           </div>
           <div className="hidden lg:flex items-center">
             <Link
-              href="/admin"
-              className="inline-block bg-primary hover:bg-primary-dark py-2 px-4 rounded-md font-medium text-sm text-white"
+              to="/admin"
+              className="inline-block bg-[#252359] hover:bg-[#1a1a40] py-2 px-4 rounded-md font-medium text-sm text-white"
             >
               Acceso Agentes
             </Link>
@@ -55,11 +52,13 @@ export default function Header() {
           <div className="flex lg:hidden">
             <button
               type="button"
-              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-dark"
+              className="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-[#0D0D0D]"
               onClick={() => setMobileMenuOpen(true)}
             >
               <span className="sr-only">Abrir menú principal</span>
-              <Bars3Icon className="h-6 w-6" aria-hidden="true" />
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
           </div>
         </div>
@@ -70,8 +69,8 @@ export default function Header() {
         <div className="fixed inset-0 bg-black/25" aria-hidden="true" onClick={() => setMobileMenuOpen(false)} />
         <div className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto bg-white py-6 px-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
           <div className="flex items-center justify-between">
-            <Link href="/" className="-m-1.5 p-1.5" onClick={() => setMobileMenuOpen(false)}>
-              <span className="text-2xl font-bold text-primary">Inmobiliaria<span className="text-secondary">Zaragoza</span></span>
+            <Link to="/" className="-m-1.5 p-1.5" onClick={() => setMobileMenuOpen(false)}>
+              <span className="text-2xl font-bold text-[#252359]">Inmobiliaria<span className="text-[#2D3773]">Zaragoza</span></span>
             </Link>
             <button
               type="button"
@@ -79,7 +78,9 @@ export default function Header() {
               onClick={() => setMobileMenuOpen(false)}
             >
               <span className="sr-only">Cerrar menú</span>
-              <XMarkIcon className="h-6 w-6" aria-hidden="true" />
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
           <div className="mt-6 flow-root">
@@ -88,11 +89,11 @@ export default function Header() {
                 {navigation.map((link) => (
                   <Link
                     key={link.name}
-                    href={link.href}
+                    to={link.href}
                     className={`${
                       isActive(link.href)
-                        ? 'bg-gray-50 text-primary'
-                        : 'text-dark hover:bg-gray-50'
+                        ? 'bg-gray-50 text-[#252359]'
+                        : 'text-[#0D0D0D] hover:bg-gray-50'
                     } -mx-3 block rounded-lg px-3 py-2 text-base font-medium`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
@@ -102,8 +103,8 @@ export default function Header() {
               </div>
               <div className="py-6">
                 <Link
-                  href="/admin"
-                  className="inline-block w-full bg-primary hover:bg-primary-dark py-2.5 px-4 rounded-md font-medium text-sm text-white text-center"
+                  to="/admin"
+                  className="inline-block w-full bg-[#252359] hover:bg-[#1a1a40] py-2.5 px-4 rounded-md font-medium text-sm text-white text-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Acceso Agentes
@@ -116,3 +117,5 @@ export default function Header() {
     </header>
   );
 }
+
+export default Header;
