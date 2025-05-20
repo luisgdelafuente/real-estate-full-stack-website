@@ -12,6 +12,15 @@ import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminProperties from './pages/admin/AdminProperties';
+import AdminPropertyForm from './pages/admin/AdminPropertyForm';
+import AdminBlog from './pages/admin/AdminBlog';
+import AdminPostForm from './pages/admin/AdminPostForm';
+import AdminUsers from './pages/admin/AdminUsers';
+import AdminUserForm from './pages/admin/AdminUserForm';
+import AdminCategories from './pages/admin/AdminCategories';
+import AdminCategoryForm from './pages/admin/AdminCategoryForm';
+import AdminSettings from './pages/admin/AdminSettings';
 import NotFound from './pages/NotFound';
 
 function App() {
@@ -27,6 +36,19 @@ function App() {
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/propiedades" element={<AdminProperties />} />
+        <Route path="/admin/propiedades/nueva" element={<AdminPropertyForm />} />
+        <Route path="/admin/propiedades/editar/:id" element={<AdminPropertyForm />} />
+        <Route path="/admin/blog" element={<AdminBlog />} />
+        <Route path="/admin/blog/nuevo" element={<AdminPostForm />} />
+        <Route path="/admin/blog/editar/:id" element={<AdminPostForm />} />
+        <Route path="/admin/usuarios" element={<AdminUsers />} />
+        <Route path="/admin/usuarios/nuevo" element={<AdminUserForm />} />
+        <Route path="/admin/usuarios/editar/:id" element={<AdminUserForm />} />
+        <Route path="/admin/categorias" element={<AdminCategories />} />
+        <Route path="/admin/categorias/nueva" element={<AdminCategoryForm />} />
+        <Route path="/admin/categorias/editar/:id" element={<AdminCategoryForm />} />
+        <Route path="/admin/configuracion" element={<AdminSettings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
