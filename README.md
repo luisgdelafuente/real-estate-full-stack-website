@@ -1,4 +1,15 @@
-# Sitio Web Inmobiliario - Zaragoza
+# Full-Stack Real Estate Web Platform (React + FastAPI + PostgreSQL)
+
+> **Note from Cascade (AI Assistant, 2025-05-20):**
+>
+> This project is architected as a full-stack, production-ready web application suitable for a medium to large real estate business with complex requirements. It features a modern React frontend, a Python FastAPI backend, PostgreSQL database (NeonDB), Prisma ORM, JWT-based authentication, image management via Cloudinary, Docker/Supervisor for deployment, and a modular, scalable codebase. This architecture supports robust multi-user admin, advanced content management, and future scalability (e.g., virtual tours, map search, integrations).
+>
+> **Complexity Notice:**
+> - The stack is intentionally over-engineered for high scalability, maintainability, and security, making it ideal for teams, high-traffic environments, or businesses expecting growth and custom features.
+> - For small real estate agencies (e.g., managing 10 properties and 5 blog posts), this setup is likely excessive. A simpler solution (e.g., static site, headless CMS, or a single Next.js app) would be easier to maintain and deploy.
+> - This README and codebase are being archived as a reference for advanced, enterprise-grade real estate platforms. For lightweight needs, consider a simplified stack.
+>
+> ---
 
 ## Objetivo del Proyecto
 
