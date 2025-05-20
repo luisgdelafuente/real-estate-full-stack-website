@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from prisma import Prisma
 from prisma.models import User, Property, Image, Feature, Post, Category
 from pydantic import BaseModel, EmailStr, Field, validator
@@ -78,6 +78,14 @@ class UserResponse(UserBase):
     createdAt: datetime
 
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    active: Optional[bool] = None
+    password: Optional[str] = None
+
+
 class PropertyBase(BaseModel):
     title: str
     description: str
@@ -129,6 +137,62 @@ class PropertyPatch(BaseModel):
     price: Optional[float] = None
     status: Optional[str] = None
     featured: Optional[bool] = None
+
+
+class CategoryBase(BaseModel):
+    name: str
+
+
+class CategoryCreate(CategoryBase):
+    pass
+
+
+class CategoryResponse(CategoryBase):
+    id: str
+    slug: str
+    createdAt: datetime
+    updatedAt: datetime
+
+
+class PostBase(BaseModel):
+    title: str
+    content: str
+    excerpt: Optional[str] = None
+    published: bool = False
+
+
+class PostCreate(PostBase):
+    categoryIds: List[str] = []
+
+
+class PostResponse(PostBase):
+    id: str
+    slug: str
+    coverImage: Optional[str] = None
+    createdAt: datetime
+    updatedAt: datetime
+    categories: List[CategoryResponse] = []
+
+
+class PostUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    excerpt: Optional[str] = None
+    published: Optional[bool] = None
+    categoryIds: Optional[List[str]] = None
+
+
+class DashboardStats(BaseModel):
+    activeProperties: int
+    totalProperties: int
+    soldProperties: int
+    reservedProperties: int
+    inactiveProperties: int
+    totalPosts: int
+    publishedPosts: int
+    draftPosts: int
+    totalUsers: int
+    totalCategories: int
 
 
 # --- Funciones de autenticación ---
@@ -241,8 +305,22 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+# --- Rutas de usuarios ---
+
+@app.get("/api/users", response_model=List[UserResponse])
+async def get_users(current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver los usuarios")
+    
+    users = await db.user.find_many()
+    return users
+
+
 @app.post("/api/users", response_model=UserResponse)
-async def create_user(user: UserCreate):
+async def create_user(user: UserCreate, current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para crear usuarios")
+    
     db_user = await db.user.find_unique(where={"email": user.email})
     if db_user:
         raise HTTPException(status_code=400, detail="El correo electrónico ya está registrado")
@@ -265,6 +343,83 @@ async def create_user(user: UserCreate):
 async def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
+
+@app.get("/api/users/{user_id}", response_model=UserResponse)
+async def get_user_by_id(user_id: str, current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver este usuario")
+    
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    return user
+
+
+@app.put("/api/users/{user_id}", response_model=UserResponse)
+async def update_user(user_id: str, user_data: UserUpdate, current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN" and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar este usuario")
+    
+    # Verificar que el usuario existe
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Preparar los datos para actualizar
+    update_data = {}
+    if user_data.name is not None:
+        update_data["name"] = user_data.name
+    if user_data.email is not None:
+        # Verificar que el correo no esté en uso por otro usuario
+        if user_data.email != user.email:
+            existing_user = await db.user.find_unique(where={"email": user_data.email})
+            if existing_user:
+                raise HTTPException(status_code=400, detail="El correo electrónico ya está en uso")
+        update_data["email"] = user_data.email
+    if user_data.active is not None:
+        update_data["active"] = user_data.active
+    
+    # Solo el administrador puede cambiar el rol
+    if user_data.role is not None and current_user.role == "ADMIN":
+        update_data["role"] = user_data.role
+    
+    # Actualizar la contraseña si se proporciona
+    if user_data.password is not None:
+        update_data["password"] = get_password_hash(user_data.password)
+    
+    # Actualizar el usuario
+    updated_user = await db.user.update(
+        where={"id": user_id},
+        data=update_data
+    )
+    
+    return updated_user
+
+
+@app.delete("/api/users/{user_id}")
+async def delete_user(user_id: str, current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para eliminar usuarios")
+    
+    # Verificar que el usuario existe
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # No permitir eliminar al último administrador
+    if user.role == "ADMIN":
+        admin_count = await db.user.count(where={"role": "ADMIN"})
+        if admin_count <= 1:
+            raise HTTPException(status_code=400, detail="No puedes eliminar al último administrador")
+    
+    # Eliminar el usuario
+    await db.user.delete(where={"id": user_id})
+    
+    return {"detail": "Usuario eliminado correctamente"}
+
+
+# --- Rutas de propiedades ---
 
 @app.get("/api/properties", response_model=List[PropertyResponse])
 async def get_properties(
@@ -578,6 +733,469 @@ async def get_featured_properties(limit: int = 6):
     )
     
     return properties
+
+
+# --- Rutas de categorías ---
+
+@app.get("/api/categories", response_model=List[CategoryResponse])
+async def get_categories():
+    categories = await db.category.find_many()
+    return categories
+
+
+@app.post("/api/categories", response_model=CategoryResponse)
+async def create_category(category_data: CategoryCreate, current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para crear categorías")
+    
+    # Crear slug a partir del nombre
+    slug = slugify(category_data.name)
+    
+    # Verificar si el slug ya existe
+    existing_category = await db.category.find_unique(where={"slug": slug})
+    counter = 1
+    while existing_category:
+        slug = f"{slug}-{counter}"
+        existing_category = await db.category.find_unique(where={"slug": slug})
+        counter += 1
+    
+    # Crear la categoría
+    category = await db.category.create(
+        data={
+            "name": category_data.name,
+            "slug": slug
+        }
+    )
+    
+    return category
+
+
+@app.get("/api/categories/{category_id}", response_model=CategoryResponse)
+async def get_category(category_id: str):
+    category = await db.category.find_unique(where={"id": category_id})
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    return category
+
+
+@app.put("/api/categories/{category_id}", response_model=CategoryResponse)
+async def update_category(
+    category_id: str,
+    category_data: CategoryCreate,
+    current_user: User = Depends(get_current_active_user)
+):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar categorías")
+    
+    # Verificar que la categoría existe
+    category = await db.category.find_unique(where={"id": category_id})
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    # Si el nombre ha cambiado, actualizar el slug
+    if category.name != category_data.name:
+        slug = slugify(category_data.name)
+        
+        # Verificar si el nuevo slug ya existe
+        existing_category = await db.category.find_unique(where={"slug": slug})
+        counter = 1
+        while existing_category and existing_category.id != category_id:
+            slug = f"{slug}-{counter}"
+            existing_category = await db.category.find_unique(where={"slug": slug})
+            counter += 1
+        
+        # Actualizar la categoría con el nuevo nombre y slug
+        updated_category = await db.category.update(
+            where={"id": category_id},
+            data={
+                "name": category_data.name,
+                "slug": slug
+            }
+        )
+    else:
+        # Solo actualizar el nombre si es necesario
+        updated_category = await db.category.update(
+            where={"id": category_id},
+            data={
+                "name": category_data.name
+            }
+        )
+    
+    return updated_category
+
+
+@app.delete("/api/categories/{category_id}")
+async def delete_category(category_id: str, current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para eliminar categorías")
+    
+    # Verificar que la categoría existe
+    category = await db.category.find_unique(where={"id": category_id})
+    if not category:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    
+    # Eliminar la categoría (las relaciones se eliminarán en cascada)
+    await db.category.delete(where={"id": category_id})
+    
+    return {"detail": "Categoría eliminada correctamente"}
+
+
+# --- Rutas de posts del blog ---
+
+@app.get("/api/posts", response_model=List[PostResponse])
+async def get_posts(
+    published: Optional[bool] = None,
+    category_id: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10
+):
+    # Construir la consulta
+    where = {}
+    
+    if published is not None:
+        where["published"] = published
+    
+    if category_id:
+        # Buscar posts con esa categoría
+        where["categories"] = {
+            "some": {
+                "categoryId": category_id
+            }
+        }
+    
+    # Buscar los posts
+    posts = await db.post.find_many(
+        where=where,
+        include={
+            "categories": {
+                "include": {
+                    "category": True
+                }
+            }
+        },
+        skip=skip,
+        take=limit,
+        order_by={
+            "createdAt": "desc"
+        }
+    )
+    
+    # Transformar la respuesta para que se ajuste al modelo
+    result = []
+    for post in posts:
+        categories = []
+        for cp in post.categories:
+            categories.append({
+                "id": cp.category.id,
+                "name": cp.category.name,
+                "slug": cp.category.slug,
+                "createdAt": cp.category.createdAt,
+                "updatedAt": cp.category.updatedAt
+            })
+        
+        post_dict = post.dict()
+        post_dict["categories"] = categories
+        result.append(post_dict)
+    
+    return result
+
+
+@app.post("/api/posts", response_model=PostResponse)
+async def create_post(post_data: PostCreate, current_user: User = Depends(get_current_active_user)):
+    # Crear slug a partir del título
+    base_slug = slugify(post_data.title)
+    slug = base_slug
+    
+    # Verificar si el slug ya existe
+    existing_post = await db.post.find_unique(where={"slug": slug})
+    counter = 1
+    while existing_post:
+        slug = f"{base_slug}-{counter}"
+        existing_post = await db.post.find_unique(where={"slug": slug})
+        counter += 1
+    
+    # Preparar los datos para crear el post
+    post_create_data = {
+        "title": post_data.title,
+        "slug": slug,
+        "content": post_data.content,
+        "published": post_data.published,
+        "userId": current_user.id
+    }
+    
+    if post_data.excerpt:
+        post_create_data["excerpt"] = post_data.excerpt
+    
+    # Crear el post
+    post = await db.post.create(
+        data=post_create_data
+    )
+    
+    # Añadir las categorías
+    categories = []
+    for category_id in post_data.categoryIds:
+        # Verificar que la categoría existe
+        category = await db.category.find_unique(where={"id": category_id})
+        if category:
+            # Añadir la relación
+            await db.categoryonpost.create(
+                data={
+                    "postId": post.id,
+                    "categoryId": category_id
+                }
+            )
+            categories.append({
+                "id": category.id,
+                "name": category.name,
+                "slug": category.slug,
+                "createdAt": category.createdAt,
+                "updatedAt": category.updatedAt
+            })
+    
+    # Preparar la respuesta
+    post_dict = post.dict()
+    post_dict["categories"] = categories
+    
+    return post_dict
+
+
+@app.get("/api/posts/{post_id}", response_model=PostResponse)
+async def get_post(post_id: str):
+    # Buscar el post
+    post = await db.post.find_unique(
+        where={"id": post_id},
+        include={
+            "categories": {
+                "include": {
+                    "category": True
+                }
+            }
+        }
+    )
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+    
+    # Transformar la respuesta para que se ajuste al modelo
+    categories = []
+    for cp in post.categories:
+        categories.append({
+            "id": cp.category.id,
+            "name": cp.category.name,
+            "slug": cp.category.slug,
+            "createdAt": cp.category.createdAt,
+            "updatedAt": cp.category.updatedAt
+        })
+    
+    post_dict = post.dict()
+    post_dict["categories"] = categories
+    
+    return post_dict
+
+
+@app.put("/api/posts/{post_id}", response_model=PostResponse)
+async def update_post(
+    post_id: str,
+    post_data: PostUpdate,
+    current_user: User = Depends(get_current_active_user)
+):
+    # Verificar que el post existe
+    post = await db.post.find_unique(
+        where={"id": post_id},
+        include={
+            "categories": {
+                "include": {
+                    "category": True
+                }
+            }
+        }
+    )
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+    
+    # Verificar que el usuario es el autor o un administrador
+    if post.userId != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar este post")
+    
+    # Preparar los datos para actualizar
+    update_data = {}
+    
+    if post_data.title is not None:
+        if post_data.title != post.title:
+            # Actualizar el slug solo si cambió el título
+            base_slug = slugify(post_data.title)
+            slug = base_slug
+            
+            # Verificar si el nuevo slug ya existe
+            existing_post = await db.post.find_unique(where={"slug": slug})
+            counter = 1
+            while existing_post and existing_post.id != post_id:
+                slug = f"{base_slug}-{counter}"
+                existing_post = await db.post.find_unique(where={"slug": slug})
+                counter += 1
+            
+            update_data["title"] = post_data.title
+            update_data["slug"] = slug
+        else:
+            update_data["title"] = post_data.title
+    
+    if post_data.content is not None:
+        update_data["content"] = post_data.content
+    
+    if post_data.excerpt is not None:
+        update_data["excerpt"] = post_data.excerpt
+    
+    if post_data.published is not None:
+        update_data["published"] = post_data.published
+    
+    # Actualizar el post
+    updated_post = await db.post.update(
+        where={"id": post_id},
+        data=update_data
+    )
+    
+    # Actualizar las categorías si se proporcionaron
+    if post_data.categoryIds is not None:
+        # Eliminar todas las relaciones actuales
+        await db.categoryonpost.delete_many(
+            where={"postId": post_id}
+        )
+        
+        # Añadir las nuevas relaciones
+        for category_id in post_data.categoryIds:
+            # Verificar que la categoría existe
+            category = await db.category.find_unique(where={"id": category_id})
+            if category:
+                # Añadir la relación
+                await db.categoryonpost.create(
+                    data={
+                        "postId": post_id,
+                        "categoryId": category_id
+                    }
+                )
+    
+    # Obtener el post actualizado con sus categorías
+    updated_post_with_categories = await db.post.find_unique(
+        where={"id": post_id},
+        include={
+            "categories": {
+                "include": {
+                    "category": True
+                }
+            }
+        }
+    )
+    
+    # Transformar la respuesta para que se ajuste al modelo
+    categories = []
+    for cp in updated_post_with_categories.categories:
+        categories.append({
+            "id": cp.category.id,
+            "name": cp.category.name,
+            "slug": cp.category.slug,
+            "createdAt": cp.category.createdAt,
+            "updatedAt": cp.category.updatedAt
+        })
+    
+    post_dict = updated_post_with_categories.dict()
+    post_dict["categories"] = categories
+    
+    return post_dict
+
+
+@app.delete("/api/posts/{post_id}")
+async def delete_post(post_id: str, current_user: User = Depends(get_current_active_user)):
+    # Verificar que el post existe
+    post = await db.post.find_unique(where={"id": post_id})
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+    
+    # Verificar que el usuario es el autor o un administrador
+    if post.userId != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para eliminar este post")
+    
+    # Eliminar el post (las relaciones con categorías se eliminarán en cascada)
+    await db.post.delete(where={"id": post_id})
+    
+    return {"detail": "Post eliminado correctamente"}
+
+
+@app.post("/api/posts/{post_id}/cover-image")
+async def upload_post_cover_image(
+    post_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user)
+):
+    # Verificar que el post existe
+    post = await db.post.find_unique(where={"id": post_id})
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+    
+    # Verificar que el usuario es el autor o un administrador
+    if post.userId != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar este post")
+    
+    # Subir la imagen a Cloudinary
+    try:
+        content = await file.read()
+        upload_result = cloudinary.uploader.upload(
+            content,
+            folder="inmobiliaria/blog",
+            public_id=f"post-{post_id}",
+        )
+        
+        # Actualizar el post con la nueva imagen
+        updated_post = await db.post.update(
+            where={"id": post_id},
+            data={"coverImage": upload_result["secure_url"]}
+        )
+        
+        return {
+            "url": updated_post.coverImage
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al subir la imagen: {str(e)}")
+
+
+# --- Rutas de estadísticas para el dashboard ---
+
+@app.get("/api/stats/dashboard", response_model=DashboardStats)
+async def get_dashboard_stats(current_user: User = Depends(get_current_active_user)):
+    if current_user.role != "ADMIN":
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver las estadísticas")
+    
+    # Contar propiedades por estado
+    active_properties = await db.property.count(where={"status": "ACTIVE"})
+    sold_properties = await db.property.count(where={"status": "SOLD"})
+    reserved_properties = await db.property.count(where={"status": "RESERVED"})
+    inactive_properties = await db.property.count(where={"status": "INACTIVE"})
+    total_properties = active_properties + sold_properties + reserved_properties + inactive_properties
+    
+    # Contar posts
+    published_posts = await db.post.count(where={"published": True})
+    draft_posts = await db.post.count(where={"published": False})
+    total_posts = published_posts + draft_posts
+    
+    # Contar usuarios y categorías
+    total_users = await db.user.count()
+    total_categories = await db.category.count()
+    
+    return {
+        "activeProperties": active_properties,
+        "totalProperties": total_properties,
+        "soldProperties": sold_properties,
+        "reservedProperties": reserved_properties,
+        "inactiveProperties": inactive_properties,
+        "totalPosts": total_posts,
+        "publishedPosts": published_posts,
+        "draftPosts": draft_posts,
+        "totalUsers": total_users,
+        "totalCategories": total_categories
+    }
 
 
 if __name__ == "__main__":
