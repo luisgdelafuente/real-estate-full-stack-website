@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../utils/api';
 
 function AdminLogin() {
   const navigate = useNavigate();
@@ -10,9 +11,15 @@ function AdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.title = "Acceso Administración | Inmobiliaria Zaragoza";
-  }, []);
+    
+    // Verificar si el usuario ya está autenticado
+    const isAuthenticated = localStorage.getItem('isAuthenticated');
+    if (isAuthenticated) {
+      navigate('/admin/dashboard');
+    }
+  }, [navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -27,16 +34,20 @@ function AdminLogin() {
     setIsLoading(true);
     setError('');
     
-    // Simulación de autenticación para la demostración
-    setTimeout(() => {
-      if (credentials.email === 'admin@inmobiliariazaragoza.com' && credentials.password === 'adminpassword') {
-        localStorage.setItem('isAuthenticated', 'true');
-        navigate('/admin/dashboard');
-      } else {
+    try {
+      await authAPI.login(credentials.email, credentials.password);
+      // Redireccionar al dashboard
+      navigate('/admin/dashboard');
+    } catch (error) {
+      // Mostrar mensaje de error
+      if (error.status === 401) {
         setError('Credenciales incorrectas. Por favor, inténtalo de nuevo.');
-        setIsLoading(false);
+      } else {
+        setError('Error al conectar con el servidor. Por favor, inténtalo más tarde.');
       }
-    }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
