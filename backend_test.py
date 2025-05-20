@@ -23,7 +23,7 @@ class RealEstateAPITester:
         if self.token:
             headers['Authorization'] = f'Bearer {self.token}'
         
-        if data and not files:
+        if data and not files and method != 'POST':
             headers['Content-Type'] = 'application/json'
         
         self.tests_run += 1
@@ -35,6 +35,9 @@ class RealEstateAPITester:
             elif method == 'POST':
                 if files:
                     response = requests.post(url, data=data, files=files, headers=headers)
+                elif endpoint == 'api/token':
+                    # Special handling for token endpoint (form data)
+                    response = requests.post(url, data=data)
                 else:
                     response = requests.post(url, json=data, headers=headers)
             elif method == 'PUT':
