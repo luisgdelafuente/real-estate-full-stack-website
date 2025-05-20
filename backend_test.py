@@ -83,12 +83,17 @@ class RealEstateAPITester:
 
     def test_admin_login(self, email, password):
         """Test admin login and get token"""
+        form_data = {
+            "username": email,
+            "password": password
+        }
+        
         success, response = self.run_test(
             "Admin Login",
             "POST",
             "api/token",
             200,
-            data={"username": email, "password": password}
+            data=form_data
         )
         
         if success and "access_token" in response:
